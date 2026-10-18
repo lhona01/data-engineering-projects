@@ -1,0 +1,15 @@
+# secrets
+.env
+
+# generated files
+logs/
+*.log
+__pycache__/
+*.pyc
+
+# environments & editors
+venv/
+.venv/
+.vscode/
+.idea/
+.DS_Store

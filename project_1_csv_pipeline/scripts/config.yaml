@@ -1,0 +1,9 @@
+source:
+  csv_path: data/sales_data.csv
+
+destination:
+  table_name: sales
+  if_exists: append
+
+logging:
+  file: logs/pipeline.log

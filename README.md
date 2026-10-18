@@ -51,6 +51,7 @@ python, pandas, SQLAlchemy, PostgreSQL, Apache Airflow, Docker
 2. Best practices
 - storing variable in config.yaml file so the etl_pipeline is reusable for other similar data
 - storing credentials in .env files and not in code itself to not release it to public
+- Learned to write a readme and do documentation
 
 3. Process lessons
 - My first version wasn't reproducible: hardcoded paths, secrets in project folder. I restructured it so a fresh clone runs from the README

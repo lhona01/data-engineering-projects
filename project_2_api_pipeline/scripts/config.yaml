@@ -1,0 +1,9 @@
+source:
+  api_url: "http://api.open-meteo.com/v1/forecast?latitude=46.8083&longitude=-100.7838&current_weather=true"
+
+destination:
+  table_name: weather_data
+  if_exists: append
+
+logging:
+  file: logs/pipeline.log

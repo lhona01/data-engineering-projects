@@ -5,6 +5,9 @@ import logging
 from dotenv import load_dotenv
 import os
 import yaml
+import random
+import time
+from requests.exceptions import ConnectionError, Timeout, HTTPError
 
 load_dotenv()
 
@@ -28,16 +31,43 @@ logging.basicConfig(
 engine = create_engine(os.getenv("DATABASE_URL"))
 
 # Ingest data from API
-def extract_data():
-    url = config["source"]["api_url"]
+def extract_data_with_retry(url, max_retries=5, base_delay=1, max_delay=30, timeout=10):
+    RETRYABLE_STATUS = {429, 500, 502, 503, 504}
 
-    response = requests.get(url)
-    if response.status_code == 200:
-        logging.info("API data fetched successfully!")
-        return response.json()
-    else:
-        logging.error("Failed to fetch API data")
-        raise Exception("API request failed")
+    for attempt in range(1, max_retries + 1):
+        try:
+            response = requests.get(url, timeout=timeout)
+
+            if response.status_code in RETRYABLE_STATUS:
+                raise HTTPError(f"Retryable status {response.status_code}", response=response)
+
+            response.raise_for_status() # non-retryable 4xx errors raise here (only raises error if its a error code)
+            logging.info("API data fetched successfully!")
+            return response.json()
+        except (ConnectionError, Timeout) as e:
+            error = e
+        except HTTPError as e:
+            if e.response is not None and e.response.status_code not in RETRYABLE_STATUS:
+                logging.error("Failed to fetch API data")
+                raise
+            error = e
+
+        # retry logic
+        if attempt == max_retries:
+            logging.error("Failed to fetch API data")
+            raise RuntimeError(f"Failed after {max_retries} attempts") from error
+
+        # Exponential backoff: 1s, 2s, 4s, 8s.... capped at max_delay of 30sec
+        delay = min(base_delay * (2 ** (attempt - 1)), max_delay)
+        delay += random.uniform(0, delay * 0.1) # adding jitter so all api calls aren't occuring at the same time
+
+        # Use Retry-After header if the server sends one
+        retry_after = getattr(error, "response", None) and error.response.headers.get("Retry-After")
+        if retry_after and retry_after.is_digit():
+            delay = max(delay, int(retry_after))
+
+        print(f"Attempt {attempt} failed ({error}). Retrying in {delay:.1f}s...")
+        time.sleep(delay) 
 
 # -----------------------API response validation---------------------------------
 # validate api response keys/json structure
@@ -97,7 +127,8 @@ def load_data(df):
 
 # Run API pipeline
 def run_pipeline():
-    data = extract_data()
+    url = config['source']['api_url']
+    data = extract_data_with_retry(url)
     validate_json_structure(data)
     if not duplicate_record_in_table(data):
         data = transform_data(data)

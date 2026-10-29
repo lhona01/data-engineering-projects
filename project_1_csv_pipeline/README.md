@@ -36,7 +36,7 @@ python, pandas, SQLAlchemy, PostgreSQL, Apache Airflow, Docker
 ## Running with Airflow
 1. Go to the `airflow` folder at the repo root and copy `.env.example` to `.env`
 2. `docker compose up`
-3. Open the AIrflow UI, create the Postgres connection under Admin -> Connections, and trigger the `project_1_csv_pipeline` DAG
+3. Open the AIrflow UI, create the Postgres connection under Admin -> Connections and use my_postgres_conn as DB_CONN_ID, and trigger the `project_1_csv_pipeline` DAG
 
 4. ## What the pipeline does
 5. - **Extract:** [reads data/sales_data.csv]
@@ -50,6 +50,7 @@ python, pandas, SQLAlchemy, PostgreSQL, Apache Airflow, Docker
 
 2. Best practices
 - storing variable in config.yaml file so the etl_pipeline is reusable for other similar data
+- treating extract, transform, and load as seperate component of pipeline for better error handling & maintanence.
 - storing credentials in .env files and not in code itself to not release it to public
 - Learned to write a readme and do documentation
 

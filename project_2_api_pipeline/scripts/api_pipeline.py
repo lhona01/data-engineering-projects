@@ -14,6 +14,10 @@ logger = logging.getLogger(__name__) # messages show up in Airflow's task logs
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__)) # /..../project_2_api_pipeline/scripts
 BASE_DIR = os.path.dirname(SCRIPT_DIR) # /..../project_2_api_pipeline
 
+ 
+class StaleDataError(Exception):
+    """Raised when the destination table has no recent rows."""
+
 # set up logging
 def load_config():
     with open(os.path.join(SCRIPT_DIR, "config.yaml")) as f:
@@ -96,6 +100,18 @@ def duplicate_record_in_table(data, engine, table_name):
         logger.info("Duplicate record, skipping load")
         return True
     return False
+
+# check the destination table actually has recent data
+def check_freshness(engine, table_name, max_age_days=2):
+    with engine.connect() as conn:
+        count = conn.execute(text(
+            f"SELECT COUNT(*) FROM {table_name} "
+            "WHERE observation_time > (NOW() AT TIME ZONE 'UTC') "
+            "- make_interval(days => :days)"
+        ), {"days": max_age_days}).scalar()
+ 
+    if count == 0:
+        raise StaleDataError(f"No rows in {table_name} from the last {max_age_days} days")
 #------------------------------------------------------------------------------
 
 # Transform JSON data recieved via API call into pandas table (done)

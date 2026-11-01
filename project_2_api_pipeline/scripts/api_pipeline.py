@@ -1,5 +1,5 @@
 import pandas as pd
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, inspect
 import requests
 import logging
 from dotenv import load_dotenv
@@ -51,7 +51,8 @@ def extract_data_with_retry(url, max_retries=5, base_delay=1, max_delay=30, time
         delay += random.uniform(0, delay * 0.1) # adding jitter so all api calls aren't occuring at the same time
 
         # Use Retry-After header if the server sends one
-        retry_after = getattr(error, "response", None) and error.response.headers.get("Retry-After")
+        response = getattr(error, "response", None)
+        retry_after = response.headers.get("Retry-After") if response is not None else None
         if retry_after and retry_after.is_digit():
             delay = max(delay, int(retry_after))
 
@@ -79,7 +80,9 @@ def validate_json_structure(data):
 
 # validate duplicate record- if weather data hasn't been changed/updated, don't load it to table again
 # Incremental Loading??
-def duplicate_record_in_table(data, engine):
+def duplicate_record_in_table(data, engine, table_name):
+    if not inspect(engine).has_table(table_name): # ensure table exists first before trying to query it for duplicate check
+        return False
     with engine.connect() as conn:
         latest = conn.execute(text(
             """
@@ -90,7 +93,7 @@ def duplicate_record_in_table(data, engine):
             """)).scalar()
     
     if latest is not None and pd.to_datetime(data['current_weather']['time']) == pd.Timestamp(latest):
-        logger.error("Failed to load data, duplicate record!")
+        logger.info("Duplicate record, skipping load")
         return True
     return False
 #------------------------------------------------------------------------------
@@ -127,7 +130,7 @@ def run_pipeline():
     
     data = extract_data_with_retry(config['source']['api_url'])
     validate_json_structure(data)
-    if not duplicate_record_in_table(data, engine):
+    if not duplicate_record_in_table(data, engine, config['destination']['table_name']):
         data = transform_data(data)
         load_data(data, config['destination']['table_name'], engine, config['destination']['if_exists'])
         logger.info("Pipeline executed successfully!")

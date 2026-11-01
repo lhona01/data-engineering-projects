@@ -30,8 +30,12 @@ def extract_and_validate():
     json.dump(data, f)
 
 def check_duplicate_record():
+  config = api_etl.load_config()
   engine = PostgresHook(postgres_conn_id=DB_CONN_ID).get_sqlalchemy_engine()
-  return "finish" if api_etl.duplicate_record_in_table(_read_raw(), engine) else "transform"
+  is_dup = api_etl.duplicate_record_in_table(
+      _read_raw(), engine, config["destination"]["table_name"]
+  )
+  return "finish" if is_dup else "transform"
 
 def transform():
   api_etl.transform_data(_read_raw()).to_parquet(CLEAN, index=False)

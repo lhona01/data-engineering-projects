@@ -82,6 +82,7 @@ x-airflow-common:
     - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
     - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
     - ../project_1_csv_pipeline:/opt/airflow/projects/project_1_csv_pipeline
+    - ../project_2_api_pipeline:/opt/airflow/projects/project_2_api_pipeline
 
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:

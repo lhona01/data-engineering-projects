@@ -9,7 +9,7 @@ import random
 import time
 from requests.exceptions import ConnectionError, Timeout, HTTPError
 
-load_dotenv()
+logger = logging.getLogger(__name__) # messages show up in Airflow's task logs
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__)) # /..../project_2_api_pipeline/scripts
 BASE_DIR = os.path.dirname(SCRIPT_DIR) # /..../project_2_api_pipeline
@@ -18,17 +18,6 @@ BASE_DIR = os.path.dirname(SCRIPT_DIR) # /..../project_2_api_pipeline
 def load_config():
     with open(os.path.join(SCRIPT_DIR, "config.yaml")) as f:
         return yaml.safe_load(f) # conver config.yaml to python dictionary
-
-config = load_config()
-
-logging.basicConfig(
-    filename=os.path.join(BASE_DIR, config["logging"]["file"]),
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
-
-# database connection
-engine = create_engine(os.getenv("DATABASE_URL"))
 
 # Ingest data from API
 def extract_data_with_retry(url, max_retries=5, base_delay=1, max_delay=30, timeout=10):
@@ -42,19 +31,19 @@ def extract_data_with_retry(url, max_retries=5, base_delay=1, max_delay=30, time
                 raise HTTPError(f"Retryable status {response.status_code}", response=response)
 
             response.raise_for_status() # non-retryable 4xx errors raise here (only raises error if its a error code)
-            logging.info("API data fetched successfully!")
+            logger.info("API data fetched successfully!")
             return response.json()
         except (ConnectionError, Timeout) as e:
             error = e
         except HTTPError as e:
             if e.response is not None and e.response.status_code not in RETRYABLE_STATUS:
-                logging.error("Failed to fetch API data")
+                logger.error("Failed to fetch API data")
                 raise
             error = e
 
         # retry logic
         if attempt == max_retries:
-            logging.error("Failed to fetch API data")
+            logger.error("Failed to fetch API data")
             raise RuntimeError(f"Failed after {max_retries} attempts") from error
 
         # Exponential backoff: 1s, 2s, 4s, 8s.... capped at max_delay of 30sec
@@ -76,7 +65,7 @@ def validate_json_structure(data):
     if "current_weather" in data:
         current = data['current_weather']
     else:
-        logging.error("Failed to validate api resposne key")
+        logger.error("Failed to validate api resposne key")
         raise Exception("JSON Structure changed!")
 
     api_response_key = ['temperature', 'windspeed', 'winddirection', 'time']
@@ -85,12 +74,12 @@ def validate_json_structure(data):
         if key in current:
             continue
         else:
-            logging.error("Failed to validate api response key")
+            logger.error("Failed to validate api response key")
             raise Exception("JSON Structure changed!")
 
 # validate duplicate record- if weather data hasn't been changed/updated, don't load it to table again
 # Incremental Loading??
-def duplicate_record_in_table(df):
+def duplicate_record_in_table(data, engine):
     with engine.connect() as conn:
         latest = conn.execute(text(
             """
@@ -100,8 +89,8 @@ def duplicate_record_in_table(df):
             LIMIT 1
             """)).scalar()
     
-    if latest is not None and pd.to_datetime(df['current_weather']['time']) == pd.Timestamp(latest):
-        logging.error("Failed to load data, duplicate record!")
+    if latest is not None and pd.to_datetime(data['current_weather']['time']) == pd.Timestamp(latest):
+        logger.error("Failed to load data, duplicate record!")
         return True
     return False
 #------------------------------------------------------------------------------
@@ -117,23 +106,31 @@ def transform_data(data):
         'observation_time': pd.to_datetime(current['time'])
     }])
 
-    logging.info("Data transformed successfully!")
+    logger.info("Data transformed successfully!")
     return df
 
 # Load the data into PostgreSQL database
-def load_data(df):
-    df.to_sql(config["destination"]["table_name"], engine, if_exists=config["destination"]["if_exists"], index=False)
-    logging.info("Data loaded successfully!")
+def load_data(df, table_name, engine, if_exists):
+    df.to_sql(table_name, engine, if_exists=if_exists, index=False)
+    logger.info("Data loaded successfully!")
 
 # Run API pipeline
 def run_pipeline():
-    url = config['source']['api_url']
-    data = extract_data_with_retry(url)
+    load_dotenv()
+    config = load_config()
+    engine = create_engine(os.getenv("DATABASE_URL"))
+    logging.basicConfig(
+            filename=os.path.join(BASE_DIR, config["logging"]["file"]),
+            level=logging.INFO,
+            format="%(asctime)s - %(levelname)s - %(message)s",
+        )
+    
+    data = extract_data_with_retry(config['source']['api_url'])
     validate_json_structure(data)
-    if not duplicate_record_in_table(data):
+    if not duplicate_record_in_table(data, engine):
         data = transform_data(data)
-        load_data(data)
-        logging.info("Pipeline executed successfully!")
+        load_data(data, config['destination']['table_name'], engine, config['destination']['if_exists'])
+        logger.info("Pipeline executed successfully!")
 
 if __name__ == "__main__":
     run_pipeline()

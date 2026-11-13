@@ -1,0 +1,6 @@
+order_id,customer_name,product,amount,order_date
+1,Alice,Laptop,1200,2025-01-10
+2,Bob,Phone,-800,2025-01-11
+3,Charie,Tablet,,2025-01-32
+3,Charie,Tablet,,2025-01-32
+4,,Monitor,300,2025-01-13

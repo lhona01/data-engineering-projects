@@ -46,3 +46,14 @@ python, pandas, requests, SQLAlchemy, PostgresSQL, APache Airflow, Docker
 1. Go to the `airflow` folder at the repo root and copy `.env.example` to `.env`
 2. `docker compose up`
 3. Open the AIrflow UI, create the Postgres connection under Admin -> Connections and use my_postgres_conn_api as DB_CONN_ID, create another generic connection to send pipeline failure alerts to specified email (key:smtp_alerts, host:smtp.gmail.com, port:587), lastly add email to send notification to through Admin -> Variables (key: alert_email_to, value: email address, Is Encrypted: true) and trigger the `project_2_api_pipeline` DAG
+
+## What the pipeline does
+- **Extract:** [reads weather data via API call, implemented with retires, backoff, and jitters]
+- **Validate:** [validates data is current/fresh and is not same as previous data]
+- **Load:** [Loads the fresh data into weather_data table]
+
+# What I learned
+1. New concepts/best practices
+- handling api call failures via max retries, exponential backoff, and jitters for retriable error codes
+- handling JSON structure outputed by api calls
+- adding multiple multiple dags to airflow

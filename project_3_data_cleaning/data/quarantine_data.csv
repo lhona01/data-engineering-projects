@@ -1,0 +1,3 @@
+order_id,customer_name,product,amount,order_date
+2,Bob,Phone,-800.0,2025-01-11
+3,Charie,Tablet,0.0,2025-01-32

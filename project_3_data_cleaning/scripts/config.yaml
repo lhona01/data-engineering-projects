@@ -1,0 +1,9 @@
+source:
+  raw: data/raw_data.csv
+
+destination:
+  clean: data/clean_data.csv
+  quarantine: data/quarantine_data.csv
+
+logging:
+  file: logs/pipeline.log

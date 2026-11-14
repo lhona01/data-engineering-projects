@@ -12,6 +12,10 @@ def load_config():
     with open(os.path.join(SCRIPT_DIR, "config.yaml")) as f:
         return yaml.safe_load(f) 
 
+def load_rules(file):
+    with open(file) as f:
+        return yaml.safe_load(f)
+
 # Extract
 def extract_data(file_path):
     df = pd.read_csv(file_path)
@@ -27,20 +31,31 @@ def clean_data(df):
     return df
 
 # Validate (ensure data is in the correct format)
-def validate_data(df):
-    # amount in range
-    accepted_df = df[df["amount"] >= 0]
-    rejected_df = df[df["amount"] < 0]
+def validate_data(df, rules):
+    accepted_df = df.copy()
+    rejected_df = df.iloc[0:0].copy()
 
-    # date is valid
-    parsed = pd.to_datetime(accepted_df['order_date'], errors='coerce')
-    bad_mask = parsed.isna()
+    def reject(mask):
+        nonlocal accepted_df, rejected_df
+        rejected_df = pd.concat([rejected_df, accepted_df[mask]], ignore_index=True)
+        accepted_df = accepted_df[~mask]
 
-    rejected_df = pd.concat([rejected_df, accepted_df[bad_mask]], ignore_index=True)
-    accepted_df = accepted_df[~bad_mask].copy()
-    accepted_df['order_date'] = parsed[~bad_mask]
+    # required columns must not be null
+    for col in rules['required_columns']:
+        reject(accepted_df[col].isna())
 
-    logger.info("Data validated successfully!")
+    # numeric minimums
+    for col, minimum in rules['min_values'].items():
+        nums = pd.to_numeric(accepted_df[col], errors='coerce')
+        reject(nums < minimum)
+
+    # date must parse
+    for col in rules['date_columns']:
+        parsed = pd.to_datetime(accepted_df[col], errors='coerce')
+        reject(parsed.isna())
+        accepted_df = accepted_df.assign(**{col: parsed.loc[accepted_df.index]})
+
+    logger.info(f"Validation done: {len(accepted_df)} accepted, {len(rejected_df)} rejected")
     return accepted_df, rejected_df
 
 # Load
@@ -60,9 +75,13 @@ def run_pipeline():
     
     df = extract_data(os.path.join(BASE_DIR, config['source']['raw']))
     df = clean_data(df)
-    accepted_df, rejected_df = validate_data(df)
+
+    rules = load_rules(os.path.join(SCRIPT_DIR, config['validation']['rule']))
+    accepted_df, rejected_df = validate_data(df, rules)
+
     load_data(accepted_df,os.path.join(BASE_DIR, config['destination']['clean']))
     load_data(rejected_df, os.path.join(BASE_DIR, config['destination']['quarantine']))
+
     logging.info("Cleaning pipeline saved successfully")
 
 if __name__ == "__main__":

@@ -1,0 +1,12 @@
+required_columns:
+- order_id
+- customer_name
+- product
+- amount
+- order_date
+
+date_columns:
+- order_date
+
+min_values:
+  amount: 0

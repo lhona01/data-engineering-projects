@@ -7,3 +7,6 @@ destination:
 
 logging:
   file: logs/pipeline.log
+
+validation:
+  rule: validation_rule.yaml

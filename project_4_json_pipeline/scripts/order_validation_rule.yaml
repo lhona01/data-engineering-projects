@@ -1,0 +1,7 @@
+required_columns:
+- order_id
+- customer_name
+- order_date
+
+date_columns:
+- order_date

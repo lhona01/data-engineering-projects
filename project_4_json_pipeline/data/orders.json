@@ -1,0 +1,19 @@
+[
+    {
+        "order_id": 1,
+        "customer_name": "Alice",
+        "order_date": "2025-01-10",
+        "items": [
+            {"product": "Laptop", "price": 1200},
+            {"product": "Mouse", "price": 25}
+        ]
+    },
+    {
+        "order_id": 2,
+        "customer_name": "Bob",
+        "order_date": "2025-01-11",
+        "items": [
+            {"product": "Phone", "price": 800}
+        ]
+    }
+]

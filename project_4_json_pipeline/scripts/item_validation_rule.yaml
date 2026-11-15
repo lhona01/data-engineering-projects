@@ -1,0 +1,7 @@
+required_columns:
+- order_id
+- product
+- price
+
+min_values:
+  price: 0

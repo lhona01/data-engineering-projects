@@ -1,0 +1,6 @@
+pandas
+json
+sqlalchemy
+psycopg2-binary
+python-dotenv
+PyYAML

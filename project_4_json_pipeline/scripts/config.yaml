@@ -1,0 +1,12 @@
+source:
+  json_path: data/orders.json
+
+destination:
+  orders: orders
+  items: items
+  orders_quarantine: data/orders_quarantine.csv
+  items_quarantine: data/items_quarantine.csv
+
+validation:
+  orders_rule: order_validation_rule.yaml
+  items_rule: item_validation_rule.yaml
